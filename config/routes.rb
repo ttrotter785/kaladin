@@ -1,8 +1,10 @@
 Kaladin::Application.routes.draw do
-  root :to => 'login#index'
+  root :to => "statics#home"
   
-  get '/auth/twitter/callback', to: 'sessions#create', as: 'callback'
-  get '/auth/failure', to: 'sessions#error', as: 'failure'
-  get '/profile', to: 'sessions#show', as: 'show'
-  delete '/signout', to: 'sessions#destroy', as: 'signout'
+  match "/tweet" => "user#tweet", :as => :tweet
+  match "/logout" => "sessions#destroy", :as => :logout
+  
+  match "/auth/:provider/callback" => "sessions#create"
+  
+  post '/statics/friends', :to => 'statics#all_friends', :as => :get_friends
 end

@@ -5,3 +5,8 @@
 require File.expand_path('../config/application', __FILE__)
 
 Kaladin::Application.load_tasks
+
+require 'treat'
+task :setup do
+  Treat::Core::Installer.install 'english'
+end

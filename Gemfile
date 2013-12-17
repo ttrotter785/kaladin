@@ -13,6 +13,9 @@ gem "less-rails"
 gem 'twitter-text'
 gem 'twitter-bootstrap-rails'
 gem "therubyracer"
+gem "ai4r"
+gem "d3_rails"
+gem "treat"
 
 # Gems used only for assets and not required
 # in production environments by default.
