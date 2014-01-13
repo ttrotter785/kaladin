@@ -16,6 +16,7 @@ gem "therubyracer"
 gem "ai4r"
 gem "d3_rails"
 gem "treat"
+gem "lda-ruby"
 
 # Gems used only for assets and not required
 # in production environments by default.

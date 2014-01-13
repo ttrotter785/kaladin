@@ -3,6 +3,7 @@ Kaladin::Application.routes.draw do
   
   match "/tweet" => "user#tweet", :as => :tweet
   match "/logout" => "sessions#destroy", :as => :logout
+  match "/lda" => "statics#lda", :as => :get_lda
   
   match "/auth/:provider/callback" => "sessions#create"
   

@@ -9,25 +9,75 @@ class StaticsController < ApplicationController
     end
   end
 
+  def lda
+    
+    #stopwords_list = "a,s,able,about,above,according,accordingly,across,actually,after,afterwards,again,against,ain,t,all,allow,allows,almost,alone,along,already,also,although,always,am,among,amongst,an,and,another,any,anybody,anyhow,anyone,anything,anyway,anyways,anywhere,apart,appear,appreciate,appropriate,are,aren,t,around,as,aside,ask,asking,associated,at,available,away,awfully,be,became,because,become,becomes,becoming,been,before,beforehand,behind,being,believe,below,beside,besides,best,better,between,beyond,both,brief,but,by,c,mon,c,s,came,can,can,t,cannot,cant,cause,causes,certain,certainly,changes,clearly,co,com,come,comes,concerning,consequently,consider,considering,contain,containing,contains,corresponding,could,couldn,t,course,currently,definitely,described,despite,did,didn,t,different,do,does,doesn,t,doing,don,t,done,down,downwards,during,each,edu,eg,eight,either,else,elsewhere,enough,entirely,especially,et,etc,even,ever,every,everybody,everyone,everything,everywhere,ex,exactly,example,except,far,few,fifth,first,five,followed,following,follows,for,former,formerly,forth,four,from,further,furthermore,get,gets,getting,given,gives,go,goes,going,gone,got,gotten,greetings,had,hadn,t,happens,hardly,has,hasn,t,have,haven,t,having,he,he,s,hello,help,hence,her,here,here,s,hereafter,hereby,herein,hereupon,hers,herself,hi,him,himself,his,hither,hopefully,how,howbeit,however,i,d,i,ll,i,m,i,ve,ie,if,ignored,immediate,in,inasmuch,inc,indeed,indicate,indicated,indicates,inner,insofar,instead,into,inward,is,isn,t,it,it,d,it,ll,it,s,its,itself,just,keep,keeps,kept,know,knows,known,last,lately,later,latter,latterly,least,less,lest,let,let,s,like,liked,likely,little,look,looking,looks,ltd,mainly,many,may,maybe,me,mean,meanwhile,merely,might,more,moreover,most,mostly,much,must,my,myself,name,namely,nd,near,nearly,necessary,need,needs,neither,never,nevertheless,new,next,nine,no,nobody,non,none,noone,nor,normally,not,nothing,novel,now,nowhere,obviously,of,off,often,oh,ok,okay,old,on,once,one,ones,only,onto,or,other,others,otherwise,ought,our,ours,ourselves,out,outside,over,overall,own,particular,particularly,per,perhaps,placed,please,plus,possible,presumably,probably,provides,que,quite,qv,rather,rd,re,really,reasonably,regarding,regardless,regards,relatively,respectively,right,said,same,saw,say,saying,says,second,secondly,see,seeing,seem,seemed,seeming,seems,seen,self,selves,sensible,sent,serious,seriously,seven,several,shall,she,should,shouldn,t,since,six,so,some,somebody,somehow,someone,something,sometime,sometimes,somewhat,somewhere,soon,sorry,specified,specify,specifying,still,sub,such,sup,sure,t,s,take,taken,tell,tends,th,than,thank,thanks,thanx,that,that,s,thats,the,their,theirs,them,themselves,then,thence,there,there,s,thereafter,thereby,therefore,therein,theres,thereupon,these,they,they,d,they,ll,they,re,they,ve,think,third,this,thorough,thoroughly,those,though,three,through,throughout,thru,thus,to,together,too,took,toward,towards,tried,tries,truly,try,trying,twice,two,un,under,unfortunately,unless,unlikely,until,unto,up,upon,us,use,used,useful,uses,using,usually,value,various,very,via,viz,vs,want,wants,was,wasn,t,way,we,we,d,we,ll,we,re,we,ve,welcome,well,went,were,weren,t,what,what,s,whatever,when,whence,whenever,where,where,s,whereafter,whereas,whereby,wherein,whereupon,wherever,whether,which,while,whither,who,who,s,whoever,whole,whom,whose,why,will,willing,wish,with,within,without,won,t,wonder,would,would,wouldn,t,yes,yet,you,you,d,you,ll,you,re,you,ve,your,yours,yourself,yourselves,zero".split(',')
+
+    @topics = []
+    corpus = Lda::Corpus.new
+    corpus.add_document(Lda::TextDocument.new(corpus, "a lion is a wild feline animal"))
+    corpus.add_document(Lda::TextDocument.new(corpus, "a dog is a friendly animal"))
+    corpus.add_document(Lda::TextDocument.new(corpus, "a cat is a feline animal"))
+     
+    lda = Lda::Lda.new(corpus)
+    lda.verbose = false
+    lda.num_topics = (2)
+    lda.em('random')
+    @topics = lda.top_words(3)
+ 
+    #@topics = lda.top_words(words_per_topic = 1)     # print the topic 20 words per topic
+  end
+  
+  def collect_with_max_id(collection=[], max_id=nil, &block)
+    response = yield max_id
+    collection += response
+    response.empty? ? collection.flatten : collect_with_max_id(collection, response.last.id - 1, &block)
+  end
+
+  def get_all_tweets(user)
+    collect_with_max_id do |max_id|
+    options = {:count => 5, :include_rts => false}
+    options[:max_id] = max_id unless max_id.nil?
+    twitter_client.user_timeline(user, options)
+    end
+  end
 
   def all_friends(max_attempts = 100)
     # in theory, one failed attempt will occur every 15 minutes, so this could be long-running
     # with a long list of friends
+    #regexps
+    url = /( |^)http:\/\/([^\s]*\.[^\s]*)( |$)/
+    user = /@(\w+)/
+    
+    corpus = Lda::Corpus.new
+    @topics = []
+              
     num_attempts = 0
     client = twitter_client
-    @allfriends = []
+    alltweets = []
     running_count = 0
     cursor = -1
     while (cursor != 0) do
       begin
         num_attempts += 1
         # 200 is max, see https://dev.twitter.com/docs/api/1.1/get/friends/list
-        friends = client.friends(current_user.nickname, {:cursor => cursor, :count => 200} )
+        friends = client.friends(current_user.nickname, {:cursor => cursor, :count => 15} )
         friends.each do |f|
           running_count += 1
-          @allfriends << f.screen_name
+          #@allfriends << f.screen_name
+          options = {:count => 20, :include_rts => false}
+          alltweets << client.user_timeline(f.screen_name, options) #get_all_tweets(f)
+          alltweets.each do |timeline|
+            timeline.each do |tweet|
+              formatted_tweet = remove_urls_and_users(tweet.text.dup)
+              puts formatted_tweet
+              corpus.add_document(Lda::TextDocument.new(corpus, formatted_tweet))
+            end
+          end
+          break if running_count == 20
         end
         puts "#{running_count} done"
+        break if running_count == 20
         cursor = friends.next_cursor
         break if cursor == 0
       rescue Twitter::Error::TooManyRequests => error
@@ -39,8 +89,42 @@ class StaticsController < ApplicationController
           retry
         else
           raise
-        end
+        end #if
+      end #begin/try
+      
+    end #while
+    
+    lda = Lda::Lda.new(corpus)
+    lda.verbose = false
+    lda.num_topics = (3)
+    lda.em('random')
+    @topics = lda.top_words(1)
+    puts @topics
+      
+  end #method
+  
+  def remove_urls_and_users s
+      #regexps
+      url = /( |^)http:\/\/([^\s]*\.[^\s]*)( |$)/
+      user = /@(\w+)/
+
+      #replace @usernames with links to that user
+      while s =~ user
+          s.sub! "@#{$1}", ""
       end
-    end
+  
+      #replace urls with links
+      while s =~ url
+          name = $2
+          s.sub! /( |^)http:\/\/#{name}( |$)/, ""
+      end
+      
+      s.sub! "&", ""
+      s.sub! "amp", ""
+      s.sub! "RT", ""
+      s.sub! "-", ""
+      s
   end
-end
+
+
+end #class
