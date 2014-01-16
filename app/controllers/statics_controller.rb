@@ -1,4 +1,4 @@
-require 'libsvm'
+require 'classifier'
 
 class StaticsController < ApplicationController
   
@@ -48,6 +48,8 @@ class StaticsController < ApplicationController
     running_count = 0
     cursor = -1
     tweet_counter = 0
+    b = Classifier::Bayes.new
+          
     while (cursor != 0) do
       begin
         num_attempts += 1
@@ -64,6 +66,7 @@ class StaticsController < ApplicationController
              @cats[l.name] = nil 
              labels[listcounter] = l.name
              listcounter += 1
+             b.add_category(l.name)
             end
           end
           
@@ -81,69 +84,38 @@ class StaticsController < ApplicationController
                 formatted_tweet = remove_urls_and_users(tweet.text.dup)
                 #puts l.name + " " + formatted_tweet
                 if tweet_counter % 2 == 1
-                  formatted_tweets << formatted_tweet.split(/\W/).reject(&:empty?)
-                  train_labels << labels.index(l.name)
-                  feature_vectors << labels.index(l.name)
-                else
-                  test_formatted_tweets << formatted_tweet.split(/\W/).reject(&:empty?)
-                  test_labels << labels.index(l.name) #labels[l.name]
-                  test_vectors << labels.index(l.name)
+                  method = "train_#{l.name}".to_sym
+                  puts method
+                  b.send(method, formatted_tweet)
                 end
-                
-                @cats[l.name] = (test_formatted_tweets + formatted_tweets).flatten.uniq
-                
               end
             end
           end
+          
+          alllists.each do |lists|
+            lists.each do |l|
+            #  formatted_tweet = remove_urls_and_users(tweet.text.dup)
+            #  puts formatted_tweet
+              formatted_tweets.clear
+              test_formatted_tweets.clear
+              
+              tweets = client.list_timeline(l.id)
+              tweets.each do |tweet|
+                tweet_counter +=1
+                
+                formatted_tweet = remove_urls_and_users(tweet.text.dup)
+                #puts l.name + " " + formatted_tweet
+                if tweet_counter % 2 == 0
+                  puts b.classify formatted_tweet
+                end
+              end
+            end
+          end   
           break if running_count == 1
         end
         puts "#{running_count} done"
         
-        dictionary = (test_formatted_tweets + formatted_tweets).flatten.uniq
-        puts "Global dictionary: \n #{dictionary.inspect}\n\n"
-        
-        #feature_vectors = formatted_tweets.map { |doc| dictionary.map{|x| doc.(x) ? 1 : 0} }
-        #test_vectors = test_formatted_tweets.map { |doc| dictionary.map{|x| doc.include?(x) ? 1 : 0} }
-        
-        puts "First training vector: #{feature_vectors.first.inspect}\n"
-        puts "First test vector: #{test_vectors.first.inspect}\n"
-        
-        
-        # Define kernel parameters -- we'll stick with the defaults
-        sp = Libsvm::Problem.new
-        pa = Libsvm::SvmParameter.new
-        
-        pa.cache_size = 1 # in megabytes
-        
-        pa.eps = 0.001
-        pa.c = 10
-
-
-        #pa.C = 100
-        #pa.svm_type = NU_SVC
-        #pa.degree = 1
-        #pa.coef0 = 0
-        #pa.eps= 0.001
-        puts train_labels
-        puts feature_vectors
-        
-        
-        examples = [ [1,0,1], [-1,0,-1] ].map {|ary| Libsvm::Node.features(ary) }
-        labels = [1, -1]
-
-        sp.set_examples(labels, examples)
-
-        # Add documents to the training set
-        #train_labels.each_index { |i| sp.set_examples(train_labels[i], feature_vectors[i]) }
-        
-        # We're not sure which Kernel will perform best, so let's give each a try
-        #kernels = [ POLY, RBF, SIGMOID ]
-        #kernel_names = [ 'Polynomial', 'Radial basis function', 'Sigmoid' ]
-        
-        model = Libsvm::Model.train(sp, pa)
-
-        pred = model.predict(Libsvm::Node.features(1, 1, 1))
-        puts "Example [1, 1, 1] - Predicted #{pred}"
+        puts b.classify "Hey the Colts and Grigson are awesome"
         
         
         break if running_count == 1
